@@ -1,16 +1,12 @@
 #!/usr/bin/env python
-from hexbrain import *
 from random import random, randint
-from numpy import std, average
-from cmaes import *
-from quickbrain import *
-from time import time
 
 class HexBoard(object):
     def __init__(self, size, kind = "full"):
         self.size = size
         self.offset = (size-1)/2
         self.board = {}
+        self.illegal = [0,0,0]
         if kind == "hexagon":
             hexsize = ((size+1) / 2)
             b = hexsize - 1
@@ -337,18 +333,18 @@ class NNAgent(Agent):
         pos = outputs[index].keys()[0]
 #        print outputs[index]
         while not player.checkPlace(board, pos[0],pos[1]):
-            index += 1
-            try:
-                pos = outputs[index].keys()[0]
-            except:
-                print "Wrong index at: ", str(index), ", total moves: ", str(len(outputs))
-                print "All outputs:", str(outputs)
-                print "Player:", str(player.type)
-                print board
+	    index += 1
+#            try:
+            pos = outputs[index].keys()[0]
+#            except:
+#                print "Wrong index at: ", str(index), ", total moves: ", str(len(outputs))
+#                print "All outputs:", str(outputs)
+#                print "Player:", str(player.type)
+#                print board
 #                raise ValueError
-                pos = None
+#                pos = None
 #            print outputs[index]
-            illegal[player.type] += 1
+            board.illegal[player.type] += 1
         return pos
 
 def qsort(array):
@@ -361,7 +357,7 @@ def qsort(array):
         head = array[key] 
         break
     less = {key: array[key] for key in array if array[key] < head}
-    equal = [{key: array[key]} for key in array if array[key] == head]
+    equal = randomize([{key: array[key]} for key in array if array[key] == head])
     more = {key: array[key] for key in array if array[key] > head}
     if less and more:
         return qsort(more) + equal + qsort(less)
@@ -372,279 +368,14 @@ def qsort(array):
     else:
         return equal
 
-def main():
-    # Start the Basics
-    size = 9
-    inputsize = 1
-    outputsize = 3
-
-    gamesper = 3
-    sigma = 0.3
-    botpercentage = 0
-
-    trainIllegal = False
-    switchBots = True
-    resetBest = True
-    resetPath = False
-    botfrequency = 1
-    agenttype = "gradient"
-
-    gens = 1000
-    
-    try:
-        data = file("brains","r")
-        init = readString(data)
-#        init = normalize(init)
-        data.close()
-    except:
-        init = [2*random() - 1 for i in range(66)]
-
-    # Start the CMA-ES
-    cma = CMAES(init,sigma)
-
-    try:
-        cmafile = file("cma", "r")
-        fileopened = True
-    except:
-        fileopened = False
-
-    if fileopened:
-        cma.readCMA(cmafile)
-        if resetBest:
-            cma.resetBest()
-        if resetPath:
-            cma.resetPath()
-        cmafile.close()
-
-    # Start the Agents
-    numagents = cma.lamb
-    numbots = int((botpercentage * numagents) / (1.0 - botpercentage))
-    totalagents = numagents + numbots
-
-    againstBotsOnly = False
-    timesright = 0
-    timestart = time()
-    global illegal
-    for runs in range(gens):
-        print "Generation %d of %d" % (runs+1, gens)
-        cma.populate()
-        strings = [list(cma.strings[i].values) for i in range(numagents)]
-        fitness = [[0 for j in range(7)] for i in range(numagents)]
-
-        if switchBots and not trainIllegal:
-            if runs % botfrequency == 0:
-                againstBotsOnly = True
-                botpercentage = 1.0/2.0
-            elif runs % botfrequency == 1:
-                againstBotsOnly = False
-                botpercentage = 0
-        else:
-            botpercentage = 0
-
-        numbots = int((botpercentage * numagents) / (1.0 - botpercentage))
-        totalagents = numagents + numbots
-    
-        agents = []
-        for i in range(totalagents):
-            if i < numagents:
-#                agents.append(NNAgent(HexMDLSTM(size, inputsize, outputsize, strings[i])))
-                agents.append(NNAgent(QuickBrain(size, strings[i])))
-            else:
-                if agenttype == "random":
-                    agents.append(RandomAgent())
-                elif agenttype == "simple":
-                    agents.append(BotAgent(random(), random()))
-                elif agenttype == "gradient":
-                    agents.append(GradientAgent(random(), random()))
-                else: 
-                    agents.append(RandomAgent())
-
-#        boardtypes = ["random","hexagon","triangle","full"]
-        boardtypes = ["hexagon", "triangle"]
-        if againstBotsOnly:
-            maxtimes = numagents * 3 * gamesper
-        else:
-            maxtimes = totalagents * int(float(totalagents)/numagents * gamesper)
-        for times in range(maxtimes):
-            illegal = [0,0,0]
-            print "Game %d of %d (Gen %d)" % (times+1, maxtimes, runs+1)
-            
-            if againstBotsOnly:
-                agentnums = [randint(numagents,totalagents-1) for i in range(3)]
-
-                playertype = (times / numagents) % 3
-                playeragent = times % numagents
-                agentnums[playertype] = playeragent
-            else:
-                agentnums = [randint(0,totalagents-1) for i in range(3)]
-                while agentnums[0] >= numagents and agentnums[1] >= numagents and agentnums[2] >= numagents:
-                    agentnums = [randint(0,totalagents-1) for i in range(3)]
-
-            board = HexBoard(size, boardtypes[randint(0,len(boardtypes)-1)])
-            game = Game(board, [agents[agentnums[0]], agents[agentnums[1]], agents[agentnums[2]]])
-            game.start()
-            while game.computePlay():
-                pass
-            score = board.boardScore()
-            del board
-            if trainIllegal:
-#                print illegal
-                fitness[agentnums[0]][0] += illegal[0]
-                fitness[agentnums[0]][1] += 1
-                fitness[agentnums[1]][2] += illegal[1]
-                fitness[agentnums[1]][3] += 1
-                fitness[agentnums[2]][4] += illegal[2]
-                fitness[agentnums[2]][5] += 1
-            else:
-                loserscore = game.lost[0][1]
-                loser = game.lost[0][0]
-                try:
-                    middlescore = game.lost[1][1]
-                    middle = game.lost[1][0]
-                except:
-                    print game.lost
-                    print "Someone not dropped!"
-                    middle = (loser + 1) % 3
-                    middlescore = [0,0,0]
-                winner = 2*(loser + middle) % 3
-                winnerscore = score
-                if agentnums[loser] < numagents:
-                    fitness[agentnums[loser]][loser*2] += 2 + loserscore[middle] + loserscore[winner]
-                    fitness[agentnums[loser]][6] += 1
-                if agentnums[winner] < numagents:
-                    fitness[agentnums[winner]][winner*2+1] += 2 + winnerscore[winner]
-                    fitness[agentnums[winner]][6] += 1
-                if agentnums[middle] < numagents:
-                    fitness[agentnums[middle]][middle*2] += 1 + middlescore[winner]
-                    fitness[agentnums[middle]][middle*2+1] += 1 + middlescore[loser]
-                    fitness[agentnums[middle]][6] += 1
-
-        for i in range(len(fitness)):
-            if not trainIllegal:
-                total = fitness[i][6]
-                if total > 0:
-                    totalwin = float(fitness[i][1] + fitness[i][3] + fitness[i][5]) / total
-                    totalloss = float(fitness[i][0] + fitness[i][2] + fitness[i][4]) / total
-                else:
-                    totalwin = 0
-                    totalloss = 0
-                avg = totalloss - totalwin
-                print fitness[i]
-                cma.strings[i].fitness = avg
-            else:
-                illegalmoves = fitness[i][0] + fitness[i][2] + fitness[i][4]
-                gamesplayed = fitness[i][1] + fitness[i][3] + fitness[i][5]
-            
-                if gamesplayed == 0:
-                    cma.strings[i].fitness = 100
-                else:
-                    if fitness[i][1] > 0:
-                        redillegal = float(fitness[i][0]) / fitness[i][1]
-                    else:
-                        redillegal = 50
-                    if fitness[i][3] > 0:
-                        greenillegal = float(fitness[i][2]) / fitness[i][3]
-                    else:
-                        greenillegal = 50
-                    if fitness[i][4] > 0:
-                        blueillegal = float(fitness[i][4]) / fitness[i][4]
-                    else:
-                        blueillegal = 50
-                    totalillegal = float(illegalmoves) / gamesplayed
-                    maxillegal = max(redillegal, greenillegal, blueillegal)
-                    inverted =  maxillegal - (3.0*maxillegal - redillegal - greenillegal - blueillegal)
-#                cma.strings[i].fitness = float(illegalmoves)/float(gamesplayed)
-                    cma.strings[i].fitness = ((inverted**2 + 3*totalillegal**2) / 4.0)**0.5
-        print "Writing... "
-        if againstBotsOnly or trainIllegal:
-            data = file("brains","w")
-            cma.updateBest()
-            for best in range(cma.solutions):
-                writeString(data, cma.bestsolutions[best].values)
-                for string in cma.strings:
-                    writeString(data, string.values)
-            data.close()
-        fitnesses = [cma.strings[i].fitness for i in range(len(cma.strings))]
-        fitnesses.sort()
-        halflength = len(fitnesses)/2
-        halffit = fitnesses[:halflength]
-        print fitnesses
-        print halffit
-        avg = sum(halffit) / halflength
-        st = std(halffit)
-        print "Average: %.3f, StDev: %.3f" % (avg, st)
-
-        cmafile = file("cma","w")
-        cma.writeCMA(cmafile)
-        cmafile.close()
-        """
-        if avg <= size:
-            timesright += 1
-        else:
-            timesright = 0
-        if timesright >= 3:
-            print "Finished run.  Generations: %d,  Time: %.3f,  Average: %.3f, StDev: %.3f" % (runs + 1, time() - timestart, avg, st)
-            return(runs, time() - timestart, avg, st)
-            """
-        cma.run()
-
-def readString(readfrom):
-    strings = (readfrom.readline()).split(',')
-    vals = []
-    for i in range(len(strings)):
-        try:
-            vals.append(float(strings[i]))
-        except:
-            print "Can't convert:", str(strings[i])
-    return vals
-
-def writeString(writeto, string):
-    size = len(string)
-    for i in range(size - 1):
-        writeto.write(str(string[i]) + ",")
-    writeto.write(str(string[-1:][0]) + "\n")
-
-def normalize(vals):
-    largest = max([abs(v) for v in vals])
-    return [v / largest for v in vals]
-
-def main_play():
-    # Start the Basics
-    size = 7
-    inputsize = 1
-    outputsize = 3
-
-    # Start the Agents
-    numagents = 5
-
-    strings = []
-    try:
-        data = file("brains","r")
-        for i in range(numagents):
-            try:
-                strings.append(readString(data))
-            except:
-                numagents = i
-                break
-        data.close()
-    except:
-        print "No brain to load!"
-        for i in range(numagents):
-            strings.append([2*random() - 1 for i in range(66)])
-
-    agents = []
-    global illegal
-    illegal = [0,0,0]
-    for i in range(numagents):
-#        agents.append(NNAgent(QuickBrain(size, strings[i])))
-        agents.append(BotAgent(random(), random()))
-    
-    board = HexBoard(size, "hexagon")
-    game = Game(board, [None, agents[randint(0,numagents-1)], agents[0]])
-    print board
-    game.start()
-    while not game.checkWin():
-        game.computePlay()
-        print board
-
-main()
+def randomize(array):
+    if len(array) <= 1:
+        return array
+    rand1 = [x for x in array if random() < 0.5]
+    rand2 = [x for x in array if x not in rand1]
+    if rand1 != [] and rand2 != []:
+        return randomize(rand1) + randomize(rand2)
+    elif rand1 != []:
+        return randomize(rand1)
+    elif rand2 != []:
+        return randomize(rand2)

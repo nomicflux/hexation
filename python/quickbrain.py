@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 from math import exp, sqrt, tanh
 from random import random
-from scipy import dot
+from numpy import dot
 
 INPUT = 0
 INPUTGATE = 1
@@ -21,15 +20,19 @@ LEFT = 4
 RIGHT = 5
 
 class QuickBrain(object):
-    def __init__(self, size, weights = None):
+    def __init__(self, size, weights = None, outputsize = 3, sigmoidoutput = False, sendAll = False, rotate = False):
         self.size = size
         self.offset = (size-1)/2
+        self.outputsize = outputsize
+        self.sigmoidoutput = sigmoidoutput
+        self.sendAll = sendAll
         self.input = {}
+	self.rotate = rotate
         self.memlayers = [{}, {}, {}, {}, {}, {}]
         self.outputlayers = [{}, {}, {}, {}, {}, {}]
         self.w = [[] for i in range(9)]
         if weights == None:
-            self.loadWeights([1.0 for i in range(48)] + [1.0/6.0 for j in range(18)])
+            self.loadWeights([1.0 for i in range(48)] + [1.0/6.0 for j in range(6 * self.outputsize)])
         else:
             self.loadWeights(weights)
         self.setupLayers()
@@ -45,7 +48,8 @@ class QuickBrain(object):
                          weights.pop(0), weights.pop(0), # Recurrance
                          weights.pop(0),  # Output Gate
                          weights.pop(0)]  # Mem Output
-        self.w[OUTPUT] = [[weights.pop(0) for i in range(6)] for j in range(3)]
+        if not self.sendAll:
+            self.w[OUTPUT] = [[weights.pop(0) for i in range(6)] for j in range(self.outputsize)]
 
     def f(self, val):
         return tanh(val)
@@ -99,7 +103,25 @@ class QuickBrain(object):
                 self.memlayers[RIGHT][p, q+1] = 0
 
     def getOutputs(self, num):
-        invert = self.size - 1
+	(UL, UR, RT, DR, DL, LT) = (UPLEFT, UPRIGHT, RIGHT, DOWNRIGHT, DOWNLEFT, LEFT)
+	# Proper Rotation
+	if self.rotate:
+      	    if num == 1:
+		(RT, DR, DL, LT, UL, UR) = (UPLEFT, UPRIGHT, RIGHT, DOWNRIGHT, DOWNLEFT, LEFT)
+	    if num == 2:
+		(UR, RT, DR, DL, LT, UL) = (UPLEFT, UPRIGHT, RIGHT, DOWNRIGHT, DOWNLEFT, LEFT) 
+
+	invert = self.size - 1
+ 
+	# Opposite Rotation
+       	#if num == 0:
+	#	(UL, UR, RT, DR, DL, LT) = (UPLEFT, UPRIGHT, RIGHT, DOWNRIGHT, DOWNLEFT, LEFT)
+	#if num == 1:
+	#	(UL, UR, RT, DR, DL, LT) = (RIGHT, DOWNRIGHT, DOWNLEFT, LEFT, UPLEFT, UPRIGHT)
+	#if num == 2:
+	#	(UL, UR, RT, DR, DL, LT) = (UPRIGHT, RIGHT, DOWNRIGHT, DOWNLEFT, LEFT, UPLEFT) 
+
+	# No Rotation
         for y in range(self.size):
             for x in range(self.size):
                 q = y
@@ -107,54 +129,70 @@ class QuickBrain(object):
                 i = self.input[p,q]
                 memvecone = self.memlayers[UPLEFT][p, q-1]
                 memvectwo = self.memlayers[UPLEFT][p-1, q]
-                mem = self.memlayers[UPLEFT][p,q] = self.f(i * self.w[UPLEFT][INPUT]) * self.g(i*self.w[UPLEFT][INPUTGATE]) + memvecone * self.g(i*self.w[UPLEFT][FORGETGATEONE] + memvecone * self.w[UPLEFT][RECURONE]) + memvectwo * self.g(i*self.w[UPLEFT][FORGETGATETWO] + memvectwo*self.w[UPLEFT][RECURTWO])
-                self.outputlayers[UPLEFT][p,q] = self.f(mem*self.w[UPLEFT][MEMOUTPUT])*self.g(i*self.w[UPLEFT][OUTPUTGATE])
+                mem = self.memlayers[UPLEFT][p,q] = self.f(i * self.w[UL][INPUT]) * self.g(i*self.w[UL][INPUTGATE]) + memvecone * self.g(i*self.w[UL][FORGETGATEONE] + memvecone * self.w[UL][RECURONE]) + memvectwo * self.g(i*self.w[UL][FORGETGATETWO] + memvectwo*self.w[UL][RECURTWO])
+                self.outputlayers[UPLEFT][p,q] = self.f(mem*self.w[UL][MEMOUTPUT])*self.g(i*self.w[UL][OUTPUTGATE])
 
                 q = invert - y
                 p = (invert - x) + self.offset - q/2
                 i = self.input[p,q]
                 memvecone = self.memlayers[DOWNRIGHT][p, q+1]
                 memvectwo = self.memlayers[DOWNRIGHT][p+1, q]
-                mem = self.memlayers[DOWNRIGHT][p,q] = self.f(i * self.w[DOWNRIGHT][INPUT]) * self.g(i*self.w[DOWNRIGHT][INPUTGATE]) + memvecone * self.g(i*self.w[DOWNRIGHT][FORGETGATEONE] + memvecone * self.w[DOWNRIGHT][RECURONE]) + memvectwo * self.g(i*self.w[DOWNRIGHT][FORGETGATETWO] + memvectwo*self.w[DOWNRIGHT][RECURTWO])
-                self.outputlayers[DOWNRIGHT][p,q] = self.f(mem*self.w[DOWNRIGHT][MEMOUTPUT])*self.g(i*self.w[DOWNRIGHT][OUTPUTGATE])
+                mem = self.memlayers[DOWNRIGHT][p,q] = self.f(i * self.w[DR][INPUT]) * self.g(i*self.w[DR][INPUTGATE]) + memvecone * self.g(i*self.w[DR][FORGETGATEONE] + memvecone * self.w[DR][RECURONE]) + memvectwo * self.g(i*self.w[DR][FORGETGATETWO] + memvectwo*self.w[DR][RECURTWO])
+                self.outputlayers[DOWNRIGHT][p,q] = self.f(mem*self.w[DR][MEMOUTPUT])*self.g(i*self.w[DR][OUTPUTGATE])
 
                 q = invert - y
                 p = x + self.offset - q/2
                 i = self.input[p,q]
                 memvecone = self.memlayers[UPRIGHT][p-1, q]
                 memvectwo = self.memlayers[UPRIGHT][p-1, q+1]
-                mem = self.memlayers[UPRIGHT][p,q] = self.f(i * self.w[UPRIGHT][INPUT]) * self.g(i*self.w[UPRIGHT][INPUTGATE]) + memvecone * self.g(i*self.w[UPRIGHT][FORGETGATEONE] + memvecone * self.w[UPRIGHT][RECURONE]) + memvectwo * self.g(i*self.w[UPRIGHT][FORGETGATETWO] + memvectwo*self.w[UPRIGHT][RECURTWO])
-                self.outputlayers[UPRIGHT][p,q] = self.f(mem*self.w[UPRIGHT][MEMOUTPUT])*self.g(i*self.w[UPRIGHT][OUTPUTGATE])
+                mem = self.memlayers[UPRIGHT][p,q] = self.f(i * self.w[UR][INPUT]) * self.g(i*self.w[UR][INPUTGATE]) + memvecone * self.g(i*self.w[UR][FORGETGATEONE] + memvecone * self.w[UR][RECURONE]) + memvectwo * self.g(i*self.w[UR][FORGETGATETWO] + memvectwo*self.w[UR][RECURTWO])
+                self.outputlayers[UPRIGHT][p,q] = self.f(mem*self.w[UR][MEMOUTPUT])*self.g(i*self.w[UR][OUTPUTGATE])
                 
                 q = y
                 p = (invert - x) + self.offset - q/2
                 i = self.input[p,q]
                 memvecone = self.memlayers[DOWNLEFT][p+1, q-1]
                 memvectwo = self.memlayers[DOWNLEFT][p+1, q]
-                mem = self.memlayers[DOWNLEFT][p,q] = self.f(i * self.w[DOWNLEFT][INPUT]) * self.g(i*self.w[DOWNLEFT][INPUTGATE]) + memvecone * self.g(i*self.w[DOWNLEFT][FORGETGATEONE] + memvecone * self.w[DOWNLEFT][RECURONE]) + memvectwo * self.g(i*self.w[DOWNLEFT][FORGETGATETWO] + memvectwo*self.w[DOWNLEFT][RECURTWO])
-                self.outputlayers[DOWNLEFT][p,q] = self.f(mem*self.w[DOWNLEFT][MEMOUTPUT])*self.g(i*self.w[DOWNLEFT][OUTPUTGATE])
+                mem = self.memlayers[DOWNLEFT][p,q] = self.f(i * self.w[DL][INPUT]) * self.g(i*self.w[DL][INPUTGATE]) + memvecone * self.g(i*self.w[DL][FORGETGATEONE] + memvecone * self.w[DL][RECURONE]) + memvectwo * self.g(i*self.w[DL][FORGETGATETWO] + memvectwo*self.w[DL][RECURTWO])
+                self.outputlayers[DOWNLEFT][p,q] = self.f(mem*self.w[DL][MEMOUTPUT])*self.g(i*self.w[DL][OUTPUTGATE])
 
                 q = y
                 p = (invert - x) + self.offset - q / 2
                 i = self.input[p,q]
                 memvecone = self.memlayers[LEFT][p, q-1]
                 memvectwo = self.memlayers[LEFT][p+1, q-1]
-                mem = self.memlayers[LEFT][p,q] = self.f(i * self.w[LEFT][INPUT]) * self.g(i*self.w[LEFT][INPUTGATE]) + memvecone * self.g(i*self.w[LEFT][FORGETGATEONE] + memvecone * self.w[LEFT][RECURONE]) + memvectwo * self.g(i*self.w[LEFT][FORGETGATETWO] + memvectwo*self.w[LEFT][RECURTWO])
-                self.outputlayers[LEFT][p,q] = self.f(mem*self.w[LEFT][MEMOUTPUT])*self.g(i*self.w[LEFT][OUTPUTGATE])
+                mem = self.memlayers[LEFT][p,q] = self.f(i * self.w[LT][INPUT]) * self.g(i*self.w[LT][INPUTGATE]) + memvecone * self.g(i*self.w[LT][FORGETGATEONE] + memvecone * self.w[LT][RECURONE]) + memvectwo * self.g(i*self.w[LT][FORGETGATETWO] + memvectwo*self.w[LT][RECURTWO])
+                self.outputlayers[LEFT][p,q] = self.f(mem*self.w[LT][MEMOUTPUT])*self.g(i*self.w[LT][OUTPUTGATE])
 
                 q = invert - y
                 p = x + self.offset - q/2
                 i = self.input[p,q]
                 memvecone = self.memlayers[RIGHT][p-1, q+1]
                 memvectwo = self.memlayers[RIGHT][p, q+1]
-                mem = self.memlayers[RIGHT][p,q] = self.f(i * self.w[RIGHT][INPUT]) * self.g(i*self.w[RIGHT][INPUTGATE]) + memvecone * self.g(i*self.w[RIGHT][FORGETGATEONE] + memvecone * self.w[RIGHT][RECURONE]) + memvectwo * self.g(i*self.w[RIGHT][FORGETGATETWO] + memvectwo*self.w[RIGHT][RECURTWO])
-                self.outputlayers[RIGHT][p,q] = self.f(mem*self.w[RIGHT][MEMOUTPUT])*self.g(i*self.w[RIGHT][OUTPUTGATE])
+                mem = self.memlayers[RIGHT][p,q] = self.f(i * self.w[RT][INPUT]) * self.g(i*self.w[RT][INPUTGATE]) + memvecone * self.g(i*self.w[RT][FORGETGATEONE] + memvecone * self.w[RT][RECURONE]) + memvectwo * self.g(i*self.w[RT][FORGETGATETWO] + memvectwo*self.w[RT][RECURTWO])
+                self.outputlayers[RIGHT][p,q] = self.f(mem*self.w[RT][MEMOUTPUT])*self.g(i*self.w[RT][OUTPUTGATE])
             
         output = {}
-        for q in range(self.size):
-            for p in range(self.offset - q/2, self.size + self.offset - q/2):
-                output[p,q] = dot([self.outputlayers[j][p,q] for j in range(6)], self.w[OUTPUT][num])
         
+        if not self.sendAll:
+            if self.sigmoidoutput:
+                for q in range(self.size):
+                    for p in range(self.offset - q/2, self.size + self.offset - q/2):
+                        output[p,q] = self.f(dot([self.outputlayers[j][p,q] for j in range(6)], self.w[OUTPUT][num]))
+            else:
+                for q in range(self.size):
+                    for p in range(self.offset - q/2, self.size + self.offset - q/2):
+                        output[p,q] = dot([self.outputlayers[j][p,q] for j in range(6)], self.w[OUTPUT][num])
+        else:
+            if self.sigmoidoutput:
+                for q in range(self.size):
+                    for p in range(self.offset - q/2, self.size + self.offset - q/2):
+                        output[p,q] = [self.f(self.outputlayers[j][p,q]) for j in range(6)]
+            else:
+                for q in range(self.size):
+                    for p in range(self.offset - q/2, self.size + self.offset - q/2):
+                        output[p,q] = [self.outputlayers[j][p,q] for j in range(6)]
+            
         return output
 
 def printBoard(board):
