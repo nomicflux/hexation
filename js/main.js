@@ -1,11 +1,11 @@
 $(function() {
     var playerSelects = $('.playertype-select');
-    console.log("All types: ", playerTypes);
-    for(var i = 0; i < playerTypes.length; i++) {
+    var fragment = $(document.createDocumentFragment());
+    for(var i = 0, s = playerTypes.length; i < s; i++) {
         var type = playerTypes[i];
-        playerSelects.append('<option value="'+type.value+'"'+(i==0?" SELECTED":"")+'>'+type.name+'</option>"');
+        fragment.append('<option value="'+type.value+'"'+(i==0?" SELECTED":"")+'>'+type.name+'</option>"');
     };
-
+    playerSelects.append(fragment);
     resetPlayers();
     playBoard();
     hexagonBoard(7);
