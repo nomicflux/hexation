@@ -2,7 +2,7 @@
 ## Hexation Board Game and Neural Networks
 This game can be played at: [https://hexation.herokuapp.com/](https://hexation.herokuapp.com/)
 
-The python scripts for the neural networks are located in the Python directory.  The rest in for the web page.
+The python scripts for the neural networks are located in the Python directory.  The rest is for the web page.
 
 ### To-do:
 * This started as a project to provide a quick-and-dirty view of what my neural networks were doing, and the code still needs to be extensively refactored.  I want to keep the board logic, gameplay logic, and neural network logic in completely distinct modules, and use dependency injections to simulate namespaces.
