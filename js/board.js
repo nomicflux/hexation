@@ -1,5 +1,5 @@
 var playerTypes = [
-    {value: "human", name: "Humane"},
+    {value: "human", name: "Human"},
     {value: "igundwane", name: "Gundwane"},
     {value: "indlovu", name: "Ndlovu"},
     {value: "ibhubesi", name: "Bhubesi"},
