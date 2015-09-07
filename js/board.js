@@ -1,454 +1,469 @@
-var playerTypes = [
-    {value: "human", name: "Human"},
-    {value: "igundwane", name: "Gundwane"},
-    {value: "indlovu", name: "Ndlovu"},
-    {value: "ibhubesi", name: "Bhubesi"},
-    {value: "candide", name: "CandideBot"},
-    {value: "timid", name: "TimidBot"},
-    {value: "balanced", name: "BalancedBot"},
-    {value: "jerk", name: "JerkBot"},
-    {value: "montecristo", name:"MonteCristoBot"},
-    {value: "helpful", name: "HelpfulBot"},
-    {value: "misere", name: "Mis&egrave;reBot"},
-    {value: "random", name: "RandoBot"}];
-
-var svg = d3.select("#game").append("svg")
-    .attr("width", WIDTH)
-    .attr("height",HEIGHT)
-    .attr("style","margin: 10px; padding: 10px; float: left; ");
-
-var path = svg.append("g").selectAll("path");
-
-var compWeights = [];
-compWeights[RED] = {"help": 1, "hurt": 1};
-compWeights[GREEN] = {"help": 1, "hurt": 1};
-compWeights[BLUE] = {"help": 1, "hurt": 1};
-
-var humanPlayers = [];
-humanPlayers[RED] = true;
-humanPlayers[GREEN] = true;
-humanPlayers[BLUE] = true;
-
-var nnPlayers = [];
-nnPlayers[RED] = null;
-nnPlayers[GREEN] = null;
-nnPlayers[BLUE] = null;
-
-var watchThinking = false;
-
-function toggleThought() {
-  watchThinking = !watchThinking;
-}
-
-function redraw() {
-    path = path
-	.data(tiles, hexagon);
+var _board = function(_c, brain) {
+    var numhexes = _c.BASE_NUMHEXES;
+    // var maxhexes = (numhexes * numhexes) - 1;
+    // var hexlength = Math.floor(Math.min(_c.WIDTH,_c.HEIGHT) / (numhexes+1));
     
-    path.exit().remove();
+    // var longside = hexlength / 2;
+    // var shortside = longside / _c.SQRTTHREE;
+    // var side = 2*shortside;
+    
+    // var origin = [shortside + side/2, hexlength / 2];
+    // var pbasis = [0, hexlength];
+    // var qbasis = [shortside + side, hexlength / 2];
+    
+    // var det = pbasis[0]*qbasis[1] - qbasis[0]*pbasis[1];
+    // var xbasis = [qbasis[1] / det, -pbasis[1] / det];
+    // var ybasis = [-qbasis[0] / det, pbasis[0] / det];
 
-    path.enter().append("path")
-	.attr("d",hexagon);
+    var shadedTiles = [];
+    var tiles = [];
+    var maxhexes, hexlength, longside, shortside, side, origin, pbasis, qbasis, det, xbasis, ybasis;
 
+    var svg = d3.select("#game").append("svg")
+        .attr("width", _c.WIDTH)
+        .attr("height",_c.HEIGHT)
+        .attr("style","margin: 10px; padding: 10px; float: left; ");
 
-  if (brainThinking){
-    path.attr("class", function(d,i) {
-      if(d.type == 0) {
-	return "tile0-tint";
-      } else { 
-	return "tile" + d.type;
-      }
-    })
-	.transition()
- .attr("opacity", function(d,i) { 
-	if(d.tint != null) {
-	  //	    console.log(d);
-	  return d.tint;
-	} else {
-	  return 1.0;
-	} 
-      });
-  } else {
-    path.attr("class", function(d,i) {
-      return "tile" + d.type;
-    });
-  } 
-  
-    return true;
-}
+    var path = svg.append("g").selectAll("path");
 
-function hexagon(d) {
-    var centre = {"x": d.coord[0], "y": d.coord[1] };
-    var start = [centre.x - (SHORTSIDE+SIDE/2), centre.y]
-    var path = [[SHORTSIDE,LONGSIDE],
-		[SIDE, 0], 
-		[SHORTSIDE, -LONGSIDE],
-		[-SHORTSIDE, -LONGSIDE],
-		[-SIDE, 0], 
-		[-SHORTSIDE, LONGSIDE] ];
-		
-    return "M" + start + "l "+ path.join("l") +" z";
-}
+    function getSize() {
+        return numhexes;
+    };
 
-function boardNum(rgbpt) {
-    return rgbpt[2] + (rgbpt[0] +  Math.floor(rgbpt[2]/2))*NUMHEXES;
-}
+    function getMaxSize() {
+        return maxhexes;
+    };
 
-function boardVal(rgbpt) {
-    var num = boardNum(rgbpt);
-    if (num < 0 || num > MAXHEXES) {
-	return NONBOARD;
-    } else {
-	return tiles[num].type;
+    function initialBoard() {
+        hexagonBoard(7);
+    };
+
+    function setSize(n) {
+        numhexes = n;
+        brain.resetVals(n);
+
+        maxhexes = (numhexes * numhexes) - 1;
+        hexlength = Math.floor(Math.min(_c.WIDTH,_c.HEIGHT) / (numhexes+1));
+
+        longside = hexlength / 2;
+        shortside = longside / _c.SQRTTHREE;
+        side = 2*shortside;
+
+        origin = [shortside + side/2, hexlength / 2];
+        pbasis = [0, hexlength];
+        qbasis = [shortside + side, hexlength / 2];
+
+        det = pbasis[0]*qbasis[1] - qbasis[0]*pbasis[1];
+        xbasis = [qbasis[1] / det, -pbasis[1] / det];
+        ybasis = [-qbasis[0] / det, pbasis[0] / det];
     }
-}
 
-function legitCoord(coord) {
-	return (coord[2] >= 0 && coord[2] < NUMHEXES && coord[0] >= (0 - Math.floor(coord[2]/2)) && coord[0] < (NUMHEXES - Math.floor(coord[2]/2)));
-}
-
-function nextTile(coord,colour) {
-    if (!colour) {
-	colour = currPlayer;
+    function emptyBoard(n) {
+        setSize(n);
+        tiles = d3.range(numhexes*numhexes).map(function(d) {
+	    var i = d % numhexes;
+	    var j = Math.floor(d / numhexes) - Math.floor(i/2);
+	    return {"coord": coordToPoint([j,i]), "type": _c.NONEXISTENT};
+        });
     }
-//    alert(coord);
-    var newCoord;
-    if (colour == RED) {
-	newCoord = [coord[0],coord[1]+1,coord[2]-1];
-    } else if (colour == GREEN) {
-	newCoord = [coord[0]-1,coord[1],coord[2]+1];
-    } else if (colour == BLUE) {
-	newCoord = [coord[0]-1,coord[1]+1,coord[2]];
-    } 
-//    if(newCoord[2] < 0 || newCoord[2] >= NUMHEXES || newCoord[0] < (0 - Math.floor(newCoord[2]/2)) || newCoord[0] >= (NUMHEXES - Math.floor(newCoord[2]/2))) {
-//    if(!legitCoord(newCoord)) {
-//	newCoord = [-NUMHEXES,0,-NUMHEXES];
-//    }
-    return newCoord;
-}
 
-function checkValue(coord, colour, val) {
-    if(legitCoord(coord) && boardVal(coord) == val) {
-//    if(boardVal(coord) == val) {
-	var next = nextTile(coord, colour);
-	return (legitCoord(next) && boardVal(next) == val);
-    } else {
-	return false;
+    function makeBoard(n,val) {
+        setSize(n);
+        tiles = d3.range(numhexes*numhexes).map(function(d) {
+	    var i = d % numhexes;
+	    var j = Math.floor(d / numhexes) - Math.floor(i/2);
+	    return {"coord": coordToPoint([j,i]), "type": val};
+        });
+        alterBoard();
+        d3.select("#donemaking").attr("style","display: show");
+        d3.select("#change").attr("style","display: none");
+        d3.select("#reset").attr("style","display: none");
     }
-}
 
-function checkOpen(coord, colour) {
-    if(!colour) { colour = currPlayer; }
-    return checkValue(coord, colour, EMPTY);
-}
+    function madeBoard() {
+        d3.select("#donemaking").attr("style","display: none");
+        d3.select("#change").attr("style","display: show");
+        d3.select("#reset").attr("style","display: show");
+        for(var i = 0; i < tiles.length; i++) {
+	    if(tiles[i].type == _c.NONBOARD) { tiles[i].type = _c.NONEXISTENT; }
+        }
+        redraw();
+        playBoard();
+    }
 
-function checkPossible(coord,colour) {
-    if(!colour) { colour = currPlayer; }
-    return checkValue(coord,colour, (colour + POSSIBLESHIFT));
-}
+    function resetBoard() {
+        //resetPlayers();
+        for(var i = 0; i < tiles.length; i++) {
+	    if(tiles[i].type > _c.EMPTY) { tiles[i].type = _c.EMPTY; }
+        }
+        redraw();
+//        setTimeout(computerPlayer(),1);
+    }
 
-function shadeTiles(coord) {
-    clearShaded();
-    if (checkOpen(coord, currPlayer)) {
-	var pos1 = boardNum(coord);
-	var pos2 = boardNum(nextTile(coord));
-	tiles[pos1].type = currPlayer + POSSIBLESHIFT;
-	tiles[pos2].type = currPlayer + POSSIBLESHIFT;
-	shadedTiles.push(pos1);
-	shadedTiles.push(pos2);
-    } 
-    redraw();
-}
-
-function toggleSpot(rgbpt) {
-    if(boardVal(rgbpt) == EMPTY) { tiles[boardNum(rgbpt)].type = NONBOARD; } else { tiles[boardNum(rgbpt)].type = EMPTY; }
-    redraw();
-}
-
-function alterBoard() {
-    svg.on("mousemove",null)
-	.on("mousedown",function() { toggleSpot(pointToCoord(d3.mouse(this)));  });
-}
-
-function playBoard() {
-     svg.on("mousemove", function() { shadeTiles(pointToCoord(d3.mouse(this)));})
-	.on("mousedown", function() { humanPlacePiece(pointToCoord(d3.mouse(this))); });
-    if(tiles) { checkVictor(); }
-}
-
-function changePlayers() {
-    var type = [];
-  nnPlayers = [null, null, null];
-    type[RED] = redplayer.value;
-    type[GREEN] = greenplayer.value;
-    type[BLUE] = blueplayer.value;
-    for(i = RED; i <= BLUE; i++) {
-	if(type[i] == "human") {
-	    humanPlayers[i] = true;
-	    compWeights[i] = {"help": 1, "hurt": 1};
-	} else {
-	    humanPlayers[i] = false;
-	    if(type[i] == "candide") {
-		compWeights[i] = {"help": 5 + Math.random()*0.1, "hurt": Math.random()*0.1};
-	    } else if(type[i] == "jerk") {
-		compWeights[i] = {"help": 1 + Math.random()*0.1, "hurt": 2 + Math.random()*0.1};
-	    } else if(type[i] == "timid") {
-		compWeights[i] = {"help": 2 + Math.random()*0.1, "hurt": 1 + Math.random()*0.1};
-	    } else if(type[i] == "montecristo") {
-		compWeights[i] = {"help": Math.random()*0.1, "hurt": 5 + Math.random()*0.1};
-	    } else if(type[i] == "helpful") {
-		compWeights[i] = {"help": 0, "hurt": -1 + Math.random()*0.1};
-	    } else if(type[i] == "misere") {
-		compWeights[i] = {"help": -2 + Math.random()*0.1, "hurt": -1 + Math.random()*0.1};
-	    } else if(type[i] == "random") {
-		compWeights[i] = {"help": 0, "hurt": 0};
-	    } else if(type[i] == "igundwane") {
-                nnPlayers[i] = new Brain(4, igundwane);		      
-	    } else if(type[i] == "ibhubesi") {
-                nnPlayers[i] = new Brain(4, ibhubesi2);
-	    } else if(type[i] == "indlovu") {
-                nnPlayers[i] = new Brain(4, indlovu, true);
+    function randomBoard(n) {
+        setSize(n);
+        tiles = d3.range(numhexes*numhexes).map(function(d) {
+	    var i = d % numhexes;
+	    var j = Math.floor(d / numhexes) - Math.floor(i/2);
+	    if (Math.random()*5 > 2) {
+	        return {"coord": coordToPoint([j,i]), "type": _c.EMPTY};
 	    } else {
-//		compWeights[i] = {"help": Math.random(), "hurt": Math.random()};
-		compWeights[i] = {"help": 0, "hurt": 0};
+	        return {"coord": coordToPoint([j,i]), "type": _c.NONBOARD};
 	    }
-	}
+        });
     }
-    setTimeout(computerPlayer(),1);
-}
 
-
-function changeBoard() {
-    clearShaded();
-    tiles = [];
-    var size = Number(bdsize.value);
-    var type = bdtype.value;
-/*    if((size > 10 || (type == "hex" && size > 5) || (type == "rhom" && size > 8))
-       && !confirm("That board will take a while for computer players to play.  Continue?")) {
-	return;
-    }*/
-    if(type == "hex") {
-        hexagonBoard(size);
-    } else if (type == "tri") {
-	triangleBoard(size);
-    } else if (type == "rhom") {
-	rhombusBoard(size);
-    } else if (type == "makefull") {
-	makeBoard(size,EMPTY);
-    } else if (type == "makeempty") {
-	makeBoard(size,NONBOARD);
-    } else {
-	randomBoard(size);
-    }
-    resetPlayers();
-    redraw();
-}
-
-function boardState() {
-//    clearShaded();
-    var num = 0;
-    var playerVals = {"red": 0, "green": 0, "blue": 0}
-    for(var i = 0; i < NUMHEXES; i++) {
-	for(var j = -Math.floor(i / 2); j < NUMHEXES - Math.floor(i / 2); j++) {
-	    var midval = -(j+i)
-//	    if(checkOpen([j, -(j+i), i], RED)) { playerVals.red++; }
-//	    if(checkOpen([j, -(j+i), i], GREEN)) { playerVals.green++; }
-//	    if(checkOpen([j, -(j+i), i], BLUE)) { playerVals.blue++; }
-	    if(boardVal([j,midval, i]) == EMPTY) {
-		if(boardVal([j,midval+1,i-1]) == EMPTY) { playerVals.red++; }
-		if(boardVal([j-1,midval,i+1]) == EMPTY) { playerVals.green++; }
-		if(boardVal([j-1,midval+1,i]) == EMPTY) { playerVals.blue++; }
+    function rhombusBoard(n) {
+        var bottom = 2*n-1;
+        var leftover = Math.ceil(n/2)
+        emptyBoard(bottom-leftover+1);
+        for(var i = 0; i<n; i++) {
+	    for(var j = 0; j<n; j++) {
+	        tiles[boardNum(rgbCoord([(bottom-leftover) - j - i,i]))].type = _c.EMPTY;
 	    }
-	}
-    }
-    return playerVals;
-}
-
-function processVals(values, colour) {
-    var val = 0;
-    if(colour == RED) { 
-	val += compWeights[colour].help*values.red;
-	val -= compWeights[colour].hurt*values.green;
-	val -= compWeights[colour].hurt*values.blue;
-    } else if(colour == GREEN) { 
-	val -= compWeights[colour].hurt*values.red;
-	val += compWeights[colour].help*values.green;
-	val -= compWeights[colour].hurt*values.blue;
-    } else if(colour == BLUE) { 
-	val -= compWeights[colour].hurt*values.red;
-	val -= compWeights[colour].hurt*values.green;
-	val += compWeights[colour].help*values.blue;
+        }
     }
 
-    return val;
-}
+    function triangleBoard(n) {
+        emptyBoard(n);
 
-function maxVal(valCoords, colour) {
-    if(humanPlayers[colour] || (compWeights[colour].help == 0 && compWeights[colour].hurt == 0) ) { return probMaxVal(valCoords, colour); } 
-    else { return straightMaxVal(valCoords, colour); }
+        var p = 0;
+        var q = 0;
+        
+        tiles[boardNum(rgbCoord([p,q]))].type = _c.EMPTY;
 
-//    if(compWeights[colour].help == 0 && compWeights[colour].hurt == 0) { return probMaxVal(valCoords, colour); } 
-//    else { return straightMaxVal(valCoords, colour); }p
-}
-
-function straightMaxVal(valCoords, colour) {
-    var max = processVals(valCoords[0].state, colour);
-    var state = valCoords[0].state;
-    var coord = valCoords[0].coord;
-    for(var i = 0; i < valCoords.length; i++) {
-	var val = processVals(valCoords[i].state,colour);
-		if(val > max || (val == max && Math.random() > (1/NUMHEXES))) {
-		    max = val;
-		    state = valCoords[i].state;
-		    coord = valCoords[i].coord;
-		}
-    }
-    return {"state": state, "coord": coord};
-}
-
-function probMaxVal(valCoords, colour) {
-    var val = processVals(valCoords[0].state, colour);
-    var state = valCoords[0].state;
-    var coord = valCoords[0].coord;
-    var vals = [];
-    vals.push([val,state,coord]);
-    var max = 0;
-    for(var i = 0; i < valCoords.length; i++) {
-	val = processVals(valCoords[i].state,colour);
-	state = valCoords[i].state;
-	coord = valCoords[i].coord;
-	vals.push([val, state, coord]);
-	if(val > max) { max = val; }
-    }
-    var total = 0;
-    for(var i = 0; i < vals.length; i++) {
-	total += (max - vals[i][0]);
-    }
-    val = Math.random() * total;
-    var i = vals.length - 1;
-    var curr = total;
-    while (curr > val && i >= 0) {
-	curr -= (max - vals[i][0]);
-	i--;
-    }
-    if (i >= vals.length) { i = vals.length - 1; } else if(i < 0) { i = 0; }
-    return {"state": vals[i][1], "coord": vals[i][2]};
-}
-    
-function miniMax() {
-    var players = []
-    players[0] = currPlayer;
-    players[1] = (currPlayer) % 3 + 1;
-    players[2] = (currPlayer + 1) % 3 + 1;
-							       
-    if(activePlayers[players[0]] || activePlayers[players[1]] || activePlayers[players[2]]) {
-	do {
-	    if(!activePlayers[players[1]]) {
-		players[1] = players[2];
-		players[2] = players[0];
+        for(var j = 0; j < n; j++) {
+	    for(var k = 0; k < n; k++) {
+	        if(j + k < n) {
+		    tiles[boardNum(rgbCoord([p + j,q + k]))].type = _c.EMPTY; 
+		    tiles[boardNum(rgbCoord([p + k,q + j]))].type = _c.EMPTY;
+	        }
 	    }
-	    
-	    if(!activePlayers[players[2]]) {
-		players[2] = players[0];
+        }
+
+    }
+
+    function hexagonBoard(n) {
+        emptyBoard((n-1)*2+1);
+
+        var p = Math.floor(n/2);
+        var q = n -1;
+        
+        tiles[boardNum(rgbCoord([p,q]))].type = _c.EMPTY;
+        
+        for(var j = 0; j < n; j++) {
+	    for(var k = 0; k < n; k++) {
+                /*	    if(k-j <= n) { 
+		            tiles[boardNum(rgbCoord([p - j,q + k]))].type = _c.EMPTY; 
+		            tiles[boardNum(rgbCoord([p + k,q - j]))].type = _c.EMPTY;
+	                    } */ 
+	        if(j - k <= n) {
+		    tiles[boardNum(rgbCoord([p + j,q - k]))].type = _c.EMPTY; 
+		    tiles[boardNum(rgbCoord([p - k,q + j]))].type = _c.EMPTY;
+	        }
+
+	        if(j + k < n) {
+		    tiles[boardNum(rgbCoord([p + j,q + k]))].type = _c.EMPTY; 
+		    tiles[boardNum(rgbCoord([p + k,q + j]))].type = _c.EMPTY;
+	        }
+	        if(-j - k > -n) {
+		    tiles[boardNum(rgbCoord([p - j,q - k]))].type = _c.EMPTY; 
+		    tiles[boardNum(rgbCoord([p - k,q - j]))].type = _c.EMPTY;
+	        }
 	    }
-	} while(!activePlayers[players[0]] || !activePlayers[players[1]] || !activePlayers[players[2]]);
-    } else {
-	return [0,0,0];
+        }
     }
 
-    var boardVals = [];
-    /* Go through first player's positions */
-    boardVals[0] = [];
-    for(var ifirst = 0; ifirst < NUMHEXES; ifirst++) {
-	for(var jfirst = -Math.floor(ifirst / 2); jfirst < NUMHEXES - Math.floor(ifirst / 2); jfirst++) {
-	    
-	    var coordfirst = [jfirst, -(jfirst+ifirst), ifirst];
-	    if(checkOpen(coordfirst, currPlayer)) { 
-		var place = boardNum(coordfirst);
-		placePiece(coordfirst, currPlayer);
-		var state = boardState(currPlayer);
-		var gradient = minusStates(state, prevmoves[currPlayer][place]);
-//		var gradient2 = minusStates(prevmoves[0][place],prevmoves[1][place]);
-//		var gradient3 = minusStates(prevmoves[1][place],prevmoves[2][place]);
-//		var curve = minusStates(gradient, gradient2);
-//		var curve2 = minusStates(gradient2, gradient3);
-//		var inflect = minusStates(curve, curve2);
-		boardVals[0].push({"state": tangent(state, gradient), "coord": coordfirst});
-//		boardVals[0].push({"state": taylorthird(state, gradient, curve, inflect), "coord": coordfirst});
-		removePiece(coordfirst, currPlayer);
-//		prevmoves[2][place] = prevmoves[1][place];
-//		prevmoves[1][place] = prevmoves[0][place];
-		prevmoves[currPlayer][place] = state;
+    function coordToPoint(coord) {
+        return [origin[0] + coord[0]*pbasis[0] + coord[1]*qbasis[0], origin[1] + coord[0]*pbasis[1] + coord[1]*qbasis[1]];
+    }
+
+    function pointToCoord(point) {
+        var p = point[0] - origin[0];
+        var q = point[1] - origin[1];
+        var x = p*xbasis[0] + q*ybasis[0];
+        var y = p*xbasis[1] + q*ybasis[1];
+
+        return rgbCoord(neighbourCheck(x,y));
+    }
+
+    function rgbCoord(axial) {
+        return [axial[0],-(axial[1]+axial[0]),axial[1]];
+    }
+
+    function axialCoord(rgb) {
+        return [rgb[0],rgb[2]];
+    }
+
+    function clearShaded(coord) {
+        if( shadedTiles[0]) {
+	    for(var i = 0; i < shadedTiles.length; i++) {
+	        tiles[shadedTiles[i]].type = _c.EMPTY;
 	    }
-	}
+	    shadedTiles = [];
+	    redraw();
+        }
     }
-    if(boardVals[0].length > 0) {
-	return maxVal(boardVals[0],players[0]).coord;
-    } else {
-	alert("No moves!");
-	return [0,0,0];
+
+    function fullPlacePiece(coord, colour) {
+	clearShaded();
+	placePiece(coord, colour);
+	redraw();
     }
-}
 
-function tangent(x,y,z) {
-    return {"red": x.red + y.red,
-	    "green": x.green + y.green,
-	    "blue": x.blue + y.blue}
-}
-
-function taylorthird(x,y,z,w) {
-    if(currPlayer == RED) {
-/*	return {"red": x.red,
-		"green": x.green + y.green + z.green/2 + w.green / 6,
-		"blue": x.blue + 2*y.blue + 2*z.blue/2 + 4*w.blue / 3}*/
-
-	return x;
-    } else if (currPlayer == GREEN) {
-/*	return {"red": x.red + 2*y.red + 2*z.red + 4*w.red/3,
-		"green": x.green,
-		"blue": x.blue + y.blue + z.blue/2 + w.blue/6}*/
-/*	return {"red": (7*x.red + 3*y.red + 6*z.red - 10*w.red) / 6,
-		"green": (7*x.green + 3*y.green + 6*z.green - 10*w.green) / 6,
-		"blue": (7*x.blue + 3*y.blue + 6*z.blue - 10*w.blue) / 6}*/
-	return {"red": (5*x.red - 2*y.red - z.red) / 2,
-		"green": (5*x.green - 2*y.green - z.green) / 2,
-		"blue": (5*x.blue - 2*y.blue - z.blue) / 2}
-    } else {
-/*	return {"red": x.red + y.red + z.red/2 + w.red/6,
-		"green": x.green + 2*y.green + 2*z.green + 4*w.green/3,
-		"blue": x.blue} */
-
-	return x;
+    function placePiece(coord,colour) {
+//        if(!colour) { colour = currPlayer; }  // Make sure this never happens;
+        if(!colour) { colour = null; }
+	var pos1 = boardNum(coord);
+        var pos2 = boardNum(nextTile(coord, colour));
+        tiles[pos1].type = colour;
+        tiles[pos2].type = colour;
     }
-}
 
-function taylor(x,y,z) {
-    return {"red": x.red + y.red + z.red/2,
-	    "green": x.green + y.green + z.green/2,
-	    "blue": x.blue + y.blue + z.blue/2}
-}
+    function removePiece(coord, colour) {
+        if(checkValue(coord,colour,colour)) {
+	    var pos1 = boardNum(coord);
+	    var pos2 = boardNum(nextTile(coord, colour));
+	    tiles[pos1].type = _c.EMPTY;
+	    tiles[pos2].type = _c.EMPTY;
+        }
+    }
 
-function halveState(x) {
-    return {"red": x.red / 2, "green": x.green / 2, "blue": x.blue / 2}
-}
 
-function addStates(x, y) {
-    return {"red": x.red + y.red, "green": x.green + y.green, "blue": x.blue + y.blue}
-}
-
-function minusStates(x, y) {
-    return {"red": x.red - y.red, "green": x.green - y.green, "blue": x.blue - y.blue}
-}
-
-function findRandom() {
-    var moves = [];
-    for(var i = 0; i < NUMHEXES; i++) {
-	for(var j = -Math.floor(i / 2); j < NUMHEXES - Math.floor(i / 2); j++) {
-	    var coord = [j, -(j+i), i];
-	    if(checkOpen(coord, currPlayer)) {
-		moves.push(coord);
+    function neighbourCheck(x,y) {
+        var roundCoordX = Math.round(x);
+        var roundCoordY = Math.round(y);
+        var alts = [[roundCoordX,roundCoordY],
+		    [roundCoordX, roundCoordY - 1],
+		    [roundCoordX, roundCoordY + 1],
+		    [roundCoordX - 1, roundCoordY],
+		    [roundCoordX - 1, roundCoordY + 1],
+		    [roundCoordX +1, roundCoordY + 1],
+		    [roundCoordX +1, roundCoordY]];
+        var min = Math.pow(x-alts[0][0],2) + Math.pow(y-alts[0][1],2);
+        var newX = roundCoordX;
+        var newY = roundCoordY;
+        for(var i = 1; i<7; i++) {
+	    var norm = Math.pow(x-alts[i][0],2) + Math.pow(y-alts[i][1],2);
+	    if (norm < min) {
+	        min = norm;
+	        newX = alts[i][0];
+	        newY = alts[i][1];
 	    }
-	}
-    } 
-    var rand = Math.floor(Math.random()*moves.length);
-    return moves[rand];
-}
+        }
+        return [newX,newY];
+    }
+
+    function redraw() {
+        path = path
+	    .data(tiles, hexagon);
+        
+        path.exit().remove();
+
+        path.enter().append("path")
+	    .attr("d",hexagon);
+
+        if (brain.getBrainThinking()){
+            path.attr("class", function(d,i) {
+                if(d.type == 0) {
+	            return "tile0-tint";
+                } else { 
+	            return "tile" + d.type;
+                }
+            })
+	        .transition()
+                .attr("opacity", function(d,i) { 
+//                    console.log("D", d, d.tint);
+	            if(d.tint !== null) {
+	                console.log(d);
+	                return d.tint;
+	            } else {
+	                return 1.0;
+	            } 
+                });
+        } else {
+            path.attr("class", function(d,i) {
+                return "tile" + d.type;
+            });
+        } 
+        
+        return true;
+    }
+
+    function hexagon(d) {
+        var centre = {"x": d.coord[0], "y": d.coord[1] };
+        var start = [centre.x - (shortside+side/2), centre.y]
+        var path = [[shortside,longside],
+		    [side, 0], 
+		    [shortside, -longside],
+		    [-shortside, -longside],
+		    [-side, 0], 
+		    [-shortside, longside] ];
+	
+        return "M" + start + "l "+ path.join("l") +" z";
+    }
+
+    function boardNum(rgbpt) {
+        return rgbpt[2] + (rgbpt[0] +  Math.floor(rgbpt[2]/2))*numhexes;
+    }
+
+    function changeTint(coord, val) {
+        if(boardNum(coord) < maxhexes) {
+	    tiles[boardNum(coord)].tint = val;
+        }
+    }
+
+    function boardVal(rgbpt) {
+        var num = boardNum(rgbpt);
+        if (num < 0 || num > maxhexes) {
+	    return _c.NONBOARD;
+        } else {
+	    return tiles[num].type;
+        }
+    }
+
+    function legitCoord(coord) {
+	return (coord[2] >= 0 && coord[2] < numhexes && coord[0] >= (0 - Math.floor(coord[2]/2)) && coord[0] < (numhexes - Math.floor(coord[2]/2)));
+    }
+
+    function nextTile(coord,colour) {
+//        if (!colour) {  colour = currPlayer;   }
+        if (!colour) {  colour = null;   }
+        //    alert(coord);
+        var newCoord;
+        if (colour == _c.RED) {
+	    newCoord = [coord[0],coord[1]+1,coord[2]-1];
+        } else if (colour == _c.GREEN) {
+	    newCoord = [coord[0]-1,coord[1],coord[2]+1];
+        } else if (colour == _c.BLUE) {
+	    newCoord = [coord[0]-1,coord[1]+1,coord[2]];
+        } 
+        //    if(newCoord[2] < 0 || newCoord[2] >= NUMHEXES || newCoord[0] < (0 - Math.floor(newCoord[2]/2)) || newCoord[0] >= (NUMHEXES - Math.floor(newCoord[2]/2))) {
+        //    if(!legitCoord(newCoord)) {
+        //	newCoord = [-NUMHEXES,0,-NUMHEXES];
+        //    }
+        return newCoord;
+    }
+
+    function checkValue(coord, colour, val) {
+        if(legitCoord(coord) && boardVal(coord) == val) {
+            //    if(boardVal(coord) == val) {
+	    var next = nextTile(coord, colour);
+	    return (legitCoord(next) && boardVal(next) == val);
+        } else {
+	    return false;
+        }
+    }
+
+    function checkOpen(coord, colour) {
+        if(!colour) { colour = currPlayer; }
+        return checkValue(coord, colour, _c.EMPTY);
+    }
+
+    function checkPossible(coord,colour) {
+        if(!colour) { colour = currPlayer; }
+        return checkValue(coord,colour, (colour + _c.POSSIBLESHIFT));
+    }
+
+    function shadeTiles(coord, currPlayer) {
+        clearShaded();
+        if (checkOpen(coord, currPlayer)) {
+	    var pos1 = boardNum(coord);
+	    var pos2 = boardNum(nextTile(coord, currPlayer));
+	    tiles[pos1].type = currPlayer + _c.POSSIBLESHIFT;
+	    tiles[pos2].type = currPlayer + _c.POSSIBLESHIFT;
+	    shadedTiles.push(pos1);
+	    shadedTiles.push(pos2);
+        } 
+        redraw();
+    }
+
+    function toggleSpot(rgbpt) {
+        if(boardVal(rgbpt) == _c.EMPTY) { tiles[boardNum(rgbpt)].type = _c.NONBOARD; } else { tiles[boardNum(rgbpt)].type = _c.EMPTY; }
+        redraw();
+    }
+
+    function alterBoard() {
+        svg.on("mousemove",null)
+	    .on("mousedown",function() { toggleSpot(pointToCoord(d3.mouse(this)));  });
+    }
+
+    function changeBoard() {
+        clearShaded();
+        tiles = [];
+        var size = Number(bdsize.value);
+        var type = bdtype.value;
+        if(type == "hex") {
+            hexagonBoard(size);
+        } else if (type == "tri") {
+	    triangleBoard(size);
+        } else if (type == "rhom") {
+	    rhombusBoard(size);
+        } else if (type == "makefull") {
+	    makeBoard(size,_c.EMPTY);
+        } else if (type == "makeempty") {
+	    makeBoard(size,NONBOARD);
+        } else {
+	    randomBoard(size);
+        }
+//        resetPlayers();
+        redraw();
+    }
+
+    function checkBoardPositions(colour) {
+        for(var k=0; k < tiles.length; k++) {
+ 	    if (tiles[k].type == _c.EMPTY && 
+                checkOpen(pointToCoord(tiles[k].coord), colour)) {
+	        return true;
+	    }
+        }
+        return false;
+    }
+
+    function boardState() {
+        //    clearShaded();
+        var num = 0;
+        var playerVals = {"red": 0, "green": 0, "blue": 0}
+        for(var i = 0; i < numhexes; i++) {
+	    for(var j = -Math.floor(i / 2); j < numhexes - Math.floor(i / 2); j++) {
+	        var midval = -(j+i)
+                //	    if(checkOpen([j, -(j+i), i], _c.RED)) { playerVals.red++; }
+                //	    if(checkOpen([j, -(j+i), i], _c.GREEN)) { playerVals.green++; }
+                //	    if(checkOpen([j, -(j+i), i], _c.BLUE)) { playerVals.blue++; }
+	        if(boardVal([j,midval, i]) == _c.EMPTY) {
+		    if(boardVal([j,midval+1,i-1]) == _c.EMPTY) { playerVals.red++; }
+		    if(boardVal([j-1,midval,i+1]) == _c.EMPTY) { playerVals.green++; }
+		    if(boardVal([j-1,midval+1,i]) == _c.EMPTY) { playerVals.blue++; }
+	        }
+	    }
+        }
+        return playerVals;
+    }
+
+    function validTile(pos) {
+        return pos < tiles.length && tiles[pos].type == _c.EMPTY;
+    }
+
+    return {
+        removePiece: removePiece,
+        getSize: getSize,
+        getMaxSize: getMaxSize,
+        resetBoard: resetBoard,
+        changeBoard: changeBoard,
+        shadeTiles: shadeTiles,
+        placePiece: placePiece,
+        fullPlacePiece: fullPlacePiece,
+        redraw: redraw,
+        initialBoard: initialBoard,
+        boardVal: boardVal,
+        boardNum: boardNum,
+        boardState: boardState,
+        validTile: validTile,
+        changeTint: changeTint,
+        checkBoardPositions: checkBoardPositions,
+        pointToCoord: pointToCoord,
+        checkOpen: checkOpen,
+        checkPossible: checkPossible,
+        svg: svg
+    };
+};
