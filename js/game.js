@@ -39,14 +39,9 @@ var _game = function(_c, board, brain) {
 
     function toggleThought() {
         watchThinking = !watchThinking;
-        console.log("Toggling thought", watchThinking);
     }
 
     function resetPlayers(maxhexes) {
-        if(typeof maxhexes === 'undefined' || maxhexes === null) {
-            throw "Undefined argument";
-        }
-        console.log("Maxhexes: ", maxhexes);
         currPlayer = _c.RED;
         d3.select("#player" + _c.RED).style("padding-left","15px");
         d3.select("#player" + _c.RED).style("font-weight","bold");
