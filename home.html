@@ -19,9 +19,9 @@
               <option value="makeempty">My Own (from Empty Board)</option>
               <option value="rand">Random</option>
             </select>
-            <br /><input type="button" name="change" id="change" value="Change Board" onClick="changeBoard()" class="btn btn-info" />
-            <input type="button" name="reset" id="reset" value="Reset" onClick="resetBoard()" class="btn btn-danger" />
-            <input type="button" name="done" id="donemaking" value="Done Making Board" onClick="madeBoard()" class="btn btn-warning" style="display: none" />
+            <br /><input type="button" name="change" id="change" value="Change Board" class="btn btn-info" />
+            <input type="button" name="reset" id="reset" value="Reset" class="btn btn-danger" />
+            <input type="button" name="done" id="donemaking" value="Done Making Board" class="btn btn-warning" style="display: none" />
           </div>
         </form>
       </div>
@@ -35,12 +35,12 @@
           <span class="blue playertype" id="player3">Blue</span>
           <span><select id="blueplayer" class="playertype-select"></select></span>
           <div style="playertype">
-            <input type="button" class="btn btn-warning" value="Change Players" onClick="changePlayers()" />
+            <input type="button" class="btn btn-warning" id="changePlayers" value="Change Players" />
           </div>
         </form>
       </div>
       <div>
-        <input type="checkbox" id="watchThinking" onClick="toggleThought()" /> See Neural Networks' Thinking (Experimental)
+        <input type="checkbox" id="watchThinking" /> See Neural Networks' Thinking (Experimental)
       </div>
       <div>
         <span class="red playerwin" id="win1"><h3>Red won!</h3></span>
@@ -72,6 +72,7 @@
     </div>
     <script type="text/javascript" src="js/jquery-2.1.4.min.js"></script>
     <script type="text/javascript" src="js/d3.min.js"></script>
+    <script type="text/javascript" src="js/config.js" async></script>
     <script type="text/javascript" src="js/game.js" async></script>
     <script type="text/javascript" src="js/brain.js" async></script>
     <script type="text/javascript" src="js/board.js" async></script>
