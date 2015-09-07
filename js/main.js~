@@ -1,8 +1,0 @@
-resetPlayers();
-playBoard();
-hexagonBoard(7);
-resetBoard();
-checkVictor();
-redraw();
-setTimeout(computerPlayer(), 1);
-
