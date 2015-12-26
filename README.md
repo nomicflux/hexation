@@ -1,4 +1,4 @@
-# hexation
+# Hexation
 ## Hexation Board Game and Neural Networks
 This game can be played at: [https://hexation.herokuapp.com/](https://hexation.herokuapp.com/)
 
