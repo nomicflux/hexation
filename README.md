@@ -1,6 +1,6 @@
 # Hexation
 ## Hexation Board Game and Neural Networks
-This game can be played at: [https://hexation.herokuapp.com/](https://hexation.herokuapp.com/)
+This game can be played at: [http://nomicflux.github.io/hexation/](http://nomicflux.github.io/hexation/)
 
 The python scripts for the neural networks are located in the Python directory.  The rest is for the web page.
 
