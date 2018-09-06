@@ -1,0 +1,90 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Hexation</title>
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="css/hexation.css" />
+  </head>
+  <body>
+    <div class="container-fluid row-fluid">
+      <div id="game" class="col-md-4 col-xs-12"></div>
+
+      <div class="col-md-4 col-xs-12">
+        <div>
+          <form>
+            <div>
+              <label>Size:</label><input type="text" id="bdsize" name="bdsize" value="7" maxlength=2 size=2 /><br />
+              <label>Shape:</label><select id="bdtype">
+                <option value="hex" SELECTED>Hexagonal</option>
+                <option value="tri">Triagonal</option>
+                <option value="rhom">Rhombus</option>
+                <option value="makefull">My Own (from Full Board)</option>
+                <option value="makeempty">My Own (from Empty Board)</option>
+                <option value="rand">Random</option>
+              </select>
+              <br /><input type="button" name="change" id="change" value="Change Board" class="btn btn-info" />
+              <input type="button" name="reset" id="reset" value="Reset" class="btn btn-danger" />
+              <input type="button" name="done" id="donemaking" value="Done Making Board" class="btn btn-warning" style="display: none" />
+            </div>
+          </form>
+        </div>
+        <div>
+          <form>
+            <h3>Players</h3>
+            <span class="red playertype" id="player1">Red</span>
+            <span><select id="redplayer" class="playertype-select"></select></span>
+            <span class="green playertype" id="player2">Green</span>
+            <span><select id="greenplayer" class="playertype-select"></select></span>
+            <span class="blue playertype" id="player3">Blue</span>
+            <span><select id="blueplayer" class="playertype-select"></select></span>
+            <div style="playertype">
+              <input type="button" class="btn btn-warning" id="changePlayers" value="Change Players" />
+            </div>
+          </form>
+        </div>
+        <div>
+          <input type="checkbox" id="watchThinking" /> See Neural Networks' Thinking (Experimental)
+        </div>
+        <div>
+          <span class="red playerwin" id="win1"><h3>Red won!</h3></span>
+          <span class="green playerwin" id="win2"><h3>Green won!</h3></span>
+          <span class="blue playerwin" id="win3"><h3>Blue won!</h3></span>
+        </div>
+      </div>
+      <div class="col-md-4 col-xs-12">
+        <h3>Rules:</h3>
+        <p>There are 3 players: Red, Green, and Blue.  Each player can place pieces in a different direction.  The goal is keep the other players from being able to place any of their pieces down.  Last player standing wins!</p>
+        <h3>Neural Networks:</h3>
+        <ul>
+          <li>Gundwane: Taught herself to play bit by bit on tiny boards, and now is looking to make it in the bigtime. Good at finding patterns and having basic strategy, but still figuring out how to make use of space.</li>
+          <li>Ndlovu: Used to a wide open board, Ndlovu has a better grasp of strategy and patterns than Gundwane - but doesn't know quite as well what to do in closed spaces.</li>
+        </ul>
+        <h3>Bots:</h3>
+        <ul>
+          <li>CandideBot: Tends to its own garden.  Doesn't pay much attention to other players, only works toward keeping as many spaces for itself as it can.</li>
+          <li>TimidBot: Mostly works on keeping spaces for itself, but will on occasion stop other players, if they ask nicely.</li>
+          <li>JerkBot: Part of the fun of a game is screwing with the other players, but winning is pretty cool, too.</li>
+          <li>MonteCristoBot: Vengeance is all.  All other players must be utterly destroyed, at any cost.</li>
+          <li>BalancedBot: There is a light side and a dark side.  All must be brought into equilibrium.</li>
+          <li>HelpfulBot: Likes to help.  May not get the point of the game.</li>
+          <li>Mis&egrave;reBot: Would rather not be playing the game, and is trying to get out as quickly as possible.</li>
+          <li>RandoBot: oercpih934(*>%&#$(Rujhreuch92jh*(.</li>
+        </ul>
+        <div>
+          <span>
+            Code for the game can be found at <a href="https://github.com/nomicflux/hexation" target="_blank">https://github.com/nomicflux/hexation</a>.
+          </span>
+        </div>
+      </div>
+
+
+    </div>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.0.min.js"></script>
+    <script type="text/javascript" src="js/d3.min.js"></script>
+    <script type="text/javascript" src="js/config.js"></script>
+    <script type="text/javascript" src="js/brain.js"></script>
+    <script type="text/javascript" src="js/game.js"></script>
+    <script type="text/javascript" src="js/board.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+  </body>
+</html>
